@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Dashboard – OCMS</title>
+    <meta name="description" content="Manage your courses and view student counts on OCMS instructor dashboard.">
+    <link rel="stylesheet" href="/static/css/ocms.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a class="navbar-brand" href="/">🎓 OCMS</a>
+        <div class="navbar-links">
+            <a href="/">Browse</a>
+            <span class="text-muted" style="font-size:.85rem" id="userGreet"></span>
+            <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:3rem">
+        <div class="flex-between mb-4">
+            <div>
+                <h1 style="font-size:1.8rem;font-weight:800">Instructor Dashboard</h1>
+                <p class="text-muted">Manage your courses and track performance</p>
+            </div>
+            <button class="btn btn-primary" id="newCourseBtn">+ Create Course</button>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid-3 mb-4">
+            <div class="stat-card">
+                <div class="stat-value" id="statCourses">–</div>
+                <div class="stat-label">My Courses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statPublished">–</div>
+                <div class="stat-label">Published</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statStudents">–</div>
+                <div class="stat-label">Total Students</div>
+            </div>
+        </div>
+
+        <!-- Alert -->
+        <div id="alert" class="hidden mb-3"></div>
+
+        <!-- Course Table -->
+        <div class="card">
+            <div class="card-header">📚 My Courses</div>
+            <div class="card-body table-wrap" style="padding:0">
+                <table id="courseTable">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Level</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Students</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="courseTableBody">
+                        <tr>
+                            <td colspan="6" class="text-center text-muted" style="padding:2rem">Loading…</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Course Modal -->
+    <div class="modal-overlay hidden" id="courseModal">
+        <div class="modal">
+            <button class="modal-close" id="closeModal">✕</button>
+            <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:1.5rem" id="modalTitle">Create New Course</h2>
+            <div id="modalAlert" class="hidden mb-2"></div>
+            <form id="courseForm">
+                <input type="hidden" id="courseId">
+                <div class="form-group">
+                    <label class="form-label">Course Title</label>
+                    <input class="form-control" type="text" id="courseTitle" required
+                        placeholder="e.g. Complete Python Bootcamp">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" id="courseDesc" rows="3" required
+                        placeholder="What will students learn?"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                    <div class="form-group">
+                        <label class="form-label">Level</label>
+                        <select class="form-control" id="courseLevel">
+                            <option value="Beginner">Beginner</option>
+                            <option value="Intermediate">Intermediate</option>
+                            <option value="Advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Price (₹)</label>
+                        <input class="form-control" type="number" id="coursePrice" value="0" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select class="form-control" id="courseCategory">
+                        <option value="">-- Select Category --</option>
+                    </select>
+                </div>
+                <div class="form-group flex gap-1" style="align-items:center">
+                    <input type="checkbox" id="coursePublished" style="width:auto">
+                    <label class="form-label" for="coursePublished" style="margin:0">Publish immediately</label>
+                </div>
+                <button class="btn btn-primary w-100 mt-2" type="submit" id="saveBtn">Save Course</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        const token = localStorage.getItem('access_token');
+        const role = localStorage.getItem('user_role');
+        const name = localStorage.getItem('user_name');
+
+        if (!token || role !== 'INSTRUCTOR') { window.location.href = '/login/'; }
+        document.getElementById('userGreet').textContent = `Hi, ${name?.split(' ')[0] || ''}`;
+
+        function logout() { localStorage.clear(); window.location.href = '/login/'; }
+        function headers(json = true) {
+            const h = { Authorization: `Bearer ${token}` };
+            if (json) h['Content-Type'] = 'application/json';
+            return h;
+        }
+        function showAlert(elId, msg, type = 'danger') {
+            const el = document.getElementById(elId);
+            el.className = `alert alert-${type}`;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        // Load categories
+        async function loadCategories(selected = '') {
+            const res = await fetch(`${API}/categories/`);
+            const data = await res.json();
+            const sel = document.getElementById('courseCategory');
+            sel.innerHTML = '<option value="">-- Select Category --</option>';
+            (data.results || data).forEach(c => {
+                sel.innerHTML += `<option value="${c.id}" ${c.id == selected ? 'selected' : ''}>${c.name}</option>`;
+            });
+        }
+
+        // Load instructor's courses
+        async function loadCourses() {
+            const res = await fetch(`${API}/instructor/courses/`, { headers: headers() });
+            const data = await res.json();
+            const courses = data.results || data;
+
+            const published = courses.filter(c => c.is_published).length;
+            const totalStudents = courses.reduce((s, c) => s + (c.enrollment_count || 0), 0);
+            document.getElementById('statCourses').textContent = courses.length;
+            document.getElementById('statPublished').textContent = published;
+            document.getElementById('statStudents').textContent = totalStudents;
+
+            const tbody = document.getElementById('courseTableBody');
+            if (!courses.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:2rem">No courses yet. Create your first!</td></tr>';
+                return;
+            }
+            tbody.innerHTML = courses.map(c => `
+        <tr>
+          <td style="font-weight:600">${c.title}</td>
+          <td><span class="badge badge-accent">${c.level}</span></td>
+          <td>${c.price == 0 ? 'Free' : '₹' + c.price}</td>
+          <td>${c.is_published ? '<span class="badge badge-success">Published</span>' : '<span class="badge badge-muted">Draft</span>'}</td>
+          <td>${c.enrollment_count || 0}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" onclick="editCourse(${c.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCourse(${c.id}, '${c.title}')">Delete</button>
+          </td>
+        </tr>`).join('');
+        }
+
+        // Modal open (create)
+        document.getElementById('newCourseBtn').onclick = () => {
+            document.getElementById('modalTitle').textContent = 'Create New Course';
+            document.getElementById('courseForm').reset();
+            document.getElementById('courseId').value = '';
+            document.getElementById('modalAlert').classList.add('hidden');
+            loadCategories();
+            document.getElementById('courseModal').classList.remove('hidden');
+        };
+        document.getElementById('closeModal').onclick = () => document.getElementById('courseModal').classList.add('hidden');
+
+        // Edit
+        async function editCourse(id) {
+            const res = await fetch(`${API}/instructor/courses/${id}/`, { headers: headers() });
+            const c = await res.json();
+            document.getElementById('modalTitle').textContent = 'Edit Course';
+            document.getElementById('courseId').value = c.id;
+            document.getElementById('courseTitle').value = c.title;
+            document.getElementById('courseDesc').value = c.description;
+            document.getElementById('courseLevel').value = c.level;
+            document.getElementById('coursePrice').value = c.price;
+            document.getElementById('coursePublished').checked = c.is_published;
+            document.getElementById('modalAlert').classList.add('hidden');
+            await loadCategories(c.category);
+            document.getElementById('courseModal').classList.remove('hidden');
+        }
+
+        // Save (create or update)
+        document.getElementById('courseForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('courseId').value;
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${API}/instructor/courses/${id}/` : `${API}/instructor/courses/`;
+
+            const payload = {
+                title: document.getElementById('courseTitle').value,
+                description: document.getElementById('courseDesc').value,
+                level: document.getElementById('courseLevel').value,
+                price: document.getElementById('coursePrice').value,
+                category: document.getElementById('courseCategory').value || null,
+                is_published: document.getElementById('coursePublished').checked,
+            };
+
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+            try {
+                const res = await fetch(url, { method, headers: headers(), body: JSON.stringify(payload) });
+                const data = await res.json();
+                if (!res.ok) throw new Error(Object.values(data).flat()[0] || 'Save failed.');
+                document.getElementById('courseModal').classList.add('hidden');
+                showAlert('alert', `Course ${id ? 'updated' : 'created'} successfully!`, 'success');
+                loadCourses();
+            } catch (err) {
+                document.getElementById('modalAlert').className = 'alert alert-danger';
+                document.getElementById('modalAlert').textContent = err.message;
+                document.getElementById('modalAlert').classList.remove('hidden');
+            }
+            btn.disabled = false; btn.textContent = 'Save Course';
+        });
+
+        // Delete
+        async function deleteCourse(id, title) {
+            if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+            await fetch(`${API}/instructor/courses/${id}/`, { method: 'DELETE', headers: headers() });
+            showAlert('alert', 'Course deleted.', 'success');
+            loadCourses();
+        }
+
+        loadCourses();
+    </script>
+</body>
+
+</html>

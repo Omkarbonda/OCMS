@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard – OCMS</title>
+    <meta name="description" content="Platform-wide analytics and insights for OCMS administrators.">
+    <link rel="stylesheet" href="/static/css/ocms.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a class="navbar-brand" href="/">🎓 OCMS</a>
+        <div class="navbar-links">
+            <a href="/admin/" target="_blank">Django Admin</a>
+            <span class="text-muted" style="font-size:.85rem" id="userGreet"></span>
+            <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:3rem">
+        <div class="flex-between mb-4">
+            <div>
+                <h1 style="font-size:1.8rem;font-weight:800">Admin Dashboard</h1>
+                <p class="text-muted">Platform overview and analytics</p>
+            </div>
+            <button class="btn btn-outline" id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
+        </div>
+
+        <div id="alert" class="hidden mb-3"></div>
+
+        <!-- KPI Stats -->
+        <div class="grid-3 mb-4" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-value" id="statStudents">…</div>
+                <div class="stat-label">Total Students</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statInstructors">…</div>
+                <div class="stat-label">Instructors</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statCourses">…</div>
+                <div class="stat-label">Total Courses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statPublished">…</div>
+                <div class="stat-label">Published Courses</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statEnrollments">…</div>
+                <div class="stat-label">Total Enrollments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statCompleted">…</div>
+                <div class="stat-label">Completed</div>
+            </div>
+        </div>
+
+        <!-- Top Courses -->
+        <div class="card">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                🏆 Top Enrolled Courses
+                <span class="badge badge-muted" style="font-size:.75rem">Redis Cached · 15 min</span>
+            </div>
+            <div class="card-body table-wrap" style="padding:0">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Course Title</th>
+                            <th>Level</th>
+                            <th>Price</th>
+                            <th>Enrollments</th>
+                        </tr>
+                    </thead>
+                    <tbody id="topCoursesBody">
+                        <tr>
+                            <td colspan="5" class="text-center text-muted" style="padding:2rem">Loading…</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        const token = localStorage.getItem('access_token');
+        const role = localStorage.getItem('user_role');
+        const name = localStorage.getItem('user_name');
+
+        if (!token || role !== 'ADMIN') { window.location.href = '/login/'; }
+        document.getElementById('userGreet').textContent = `Hi, ${name?.split(' ')[0] || 'Admin'}`;
+
+        function logout() { localStorage.clear(); window.location.href = '/login/'; }
+        function headers() { return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }; }
+
+        async function loadAnalytics() {
+            const res = await fetch(`${API}/admin/analytics/`, { headers: headers() });
+            if (!res.ok) {
+                document.getElementById('alert').className = 'alert alert-danger';
+                document.getElementById('alert').textContent = 'Failed to load analytics. Make sure you are logged in as admin.';
+                document.getElementById('alert').classList.remove('hidden');
+                return;
+            }
+            const d = await res.json();
+            document.getElementById('statStudents').textContent = d.total_students;
+            document.getElementById('statInstructors').textContent = d.total_instructors;
+            document.getElementById('statCourses').textContent = d.total_courses;
+            document.getElementById('statPublished').textContent = d.published_courses;
+            document.getElementById('statEnrollments').textContent = d.total_enrollments;
+            document.getElementById('statCompleted').textContent = d.completed_enrollments;
+        }
+
+        async function loadTopCourses() {
+            const res = await fetch(`${API}/admin/top-courses/`, { headers: headers() });
+            const data = await res.json();
+            const tbody = document.getElementById('topCoursesBody');
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:2rem">No data yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map((c, i) => {
+                const medals = ['🥇', '🥈', '🥉'];
+                return `<tr>
+          <td style="font-size:1.3rem;font-weight:700">${medals[i] || (i + 1)}</td>
+          <td style="font-weight:600">${c.title}</td>
+          <td><span class="badge badge-accent">${c.level}</span></td>
+          <td>${c.price == 0 ? '<span class="badge badge-success">Free</span>' : '₹' + c.price}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:.75rem">
+              <div style="flex:1">
+                <div class="progress-wrap">
+                  <div class="progress-bar" style="width:${Math.min(100, (c.enrollment_count / (data[0]?.enrollment_count || 1)) * 100)}%"></div>
+                </div>
+              </div>
+              <strong>${c.enrollment_count}</strong>
+            </div>
+          </td>
+        </tr>`;
+            }).join('');
+        }
+
+        async function loadAll() {
+            await Promise.all([loadAnalytics(), loadTopCourses()]);
+        }
+
+        loadAll();
+    </script>
+</body>
+
+</html>

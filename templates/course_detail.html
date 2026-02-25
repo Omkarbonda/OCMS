@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Detail – OCMS</title>
+    <meta name="description" content="View course details, curriculum, and enroll on OCMS.">
+    <link rel="stylesheet" href="/static/css/ocms.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a class="navbar-brand" href="/">🎓 OCMS</a>
+        <div class="navbar-links">
+            <a href="/">← Back to Courses</a>
+            <span id="authNav"></span>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:3rem">
+        <div id="loadingState" class="text-center mt-4">
+            <span class="spinner" style="width:40px;height:40px;border-width:3px"></span>
+            <p class="text-muted mt-2">Loading course…</p>
+        </div>
+
+        <div id="courseContent" class="hidden">
+            <!-- Two-column layout -->
+            <div style="display:grid;grid-template-columns:1fr 340px;gap:2.5rem;align-items:start">
+                <!-- Left Column -->
+                <div>
+                    <div class="flex gap-1 mb-2" id="courseBadges"></div>
+                    <h1 id="courseTitle" style="font-size:2rem;font-weight:800;line-height:1.2;margin-bottom:1rem"></h1>
+                    <p id="courseDesc" class="text-muted" style="font-size:1rem;line-height:1.6;margin-bottom:1.5rem">
+                    </p>
+
+                    <div class="flex gap-2 mb-3" style="flex-wrap:wrap">
+                        <span class="text-muted" style="font-size:.9rem">👨‍🏫 <strong
+                                id="instructorName"></strong></span>
+                        <span class="text-muted" style="font-size:.9rem">👥 <span id="enrollCount"></span>
+                            students</span>
+                        <span class="stars" id="ratingStars" style="font-size:.9rem"></span>
+                    </div>
+
+                    <p id="instructorBio" class="text-muted mt-1"
+                        style="font-size:.88rem;font-style:italic;border-left:3px solid var(--accent);padding-left:.8rem">
+                    </p>
+
+                    <!-- Curriculum -->
+                    <div class="card mt-4">
+                        <div class="card-header">📋 Course Curriculum</div>
+                        <div id="curriculum" class="card-body"></div>
+                    </div>
+
+                    <!-- Reviews -->
+                    <div class="card mt-3">
+                        <div class="card-header">⭐ Student Reviews</div>
+                        <div id="reviewsSection" class="card-body">
+                            <p class="text-muted" style="font-size:.9rem">Loading reviews…</p>
+                        </div>
+                    </div>
+
+                    <!-- Add Review form (only shown if enrolled) -->
+                    <div id="reviewForm" class="card mt-3 hidden">
+                        <div class="card-header">Write a Review</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">Rating</label>
+                                <select class="form-control" id="reviewRating">
+                                    <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                                    <option value="4">⭐⭐⭐⭐ Good</option>
+                                    <option value="3">⭐⭐⭐ Average</option>
+                                    <option value="2">⭐⭐ Below Average</option>
+                                    <option value="1">⭐ Poor</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Comment</label>
+                                <textarea class="form-control" id="reviewComment" rows="3"
+                                    placeholder="Share your experience…"></textarea>
+                            </div>
+                            <button class="btn btn-primary" id="submitReview">Submit Review</button>
+                            <div id="reviewAlert" class="hidden mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column – Enroll Card -->
+                <div style="position:sticky;top:90px">
+                    <div class="card">
+                        <div id="courseThumbWrap"></div>
+                        <div class="card-body">
+                            <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:1rem"
+                                id="coursePrice"></div>
+                            <div id="enrollAlert" class="hidden mb-2"></div>
+                            <button class="btn btn-primary w-100" id="enrollBtn"
+                                style="font-size:1rem;padding:.75rem">Enroll Now</button>
+                            <p class="text-muted text-center mt-2" style="font-size:.8rem">30-Day Money-Back Guarantee
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        const token = localStorage.getItem('access_token');
+        const role = localStorage.getItem('user_role');
+        const courseId = window.location.pathname.split('/')[2];
+
+        // Auth nav
+        const authNav = document.getElementById('authNav');
+        if (token) {
+            authNav.innerHTML = `<button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>`;
+        } else {
+            authNav.innerHTML = `<a href="/login/" class="btn btn-primary btn-sm">Login</a>`;
+        }
+        function logout() { localStorage.clear(); window.location.href = '/login/'; }
+        function headers() { return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }; }
+
+        function formatDuration(sec) {
+            if (!sec) return '0 min';
+            const m = Math.floor(sec / 60);
+            return m > 0 ? `${m} min` : `${sec} sec`;
+        }
+
+        async function loadCourse() {
+            const [courseRes, reviewRes] = await Promise.all([
+                fetch(`${API}/courses/${courseId}/`),
+                fetch(`${API}/courses/${courseId}/reviews/`),
+            ]);
+            const course = await courseRes.json();
+            const reviews = await reviewRes.json();
+
+            document.title = `${course.title} – OCMS`;
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('courseContent').classList.remove('hidden');
+
+            // Badges
+            const badges = document.getElementById('courseBadges');
+            badges.innerHTML = `<span class="badge badge-accent">${course.level}</span>
+        <span class="badge badge-muted">${course.category?.name || 'General'}</span>`;
+
+            document.getElementById('courseTitle').textContent = course.title;
+            document.getElementById('courseDesc').textContent = course.description;
+            document.getElementById('instructorName').textContent = course.instructor_name;
+            document.getElementById('enrollCount').textContent = course.enrollment_count;
+            document.getElementById('instructorBio').textContent = course.instructor_bio || '';
+            document.getElementById('coursePrice').textContent = course.price == 0 ? 'Free' : `₹${course.price}`;
+
+            const avg = course.average_rating || 0;
+            document.getElementById('ratingStars').textContent = `${'★'.repeat(Math.round(avg))}${'☆'.repeat(5 - Math.round(avg))} ${avg}`;
+
+            // Thumbnail
+            const thumbWrap = document.getElementById('courseThumbWrap');
+            thumbWrap.innerHTML = course.thumbnail
+                ? `<img class="course-thumb" src="${course.thumbnail}" alt="${course.title}" style="height:200px">`
+                : `<div class="course-thumb-placeholder" style="height:180px">📚</div>`;
+
+            // Curriculum
+            const currEl = document.getElementById('curriculum');
+            if (!course.modules || course.modules.length === 0) {
+                currEl.innerHTML = '<p class="text-muted">No curriculum added yet.</p>';
+            } else {
+                currEl.innerHTML = course.modules.map(m => `
+          <div style="margin-bottom:1.2rem">
+            <p style="font-weight:700;margin-bottom:.5rem">📁 ${m.title}</p>
+            ${m.lectures.map(l => `
+              <div style="display:flex;justify-content:space-between;padding:.45rem .75rem;border-radius:6px;background:var(--surface2);margin-bottom:.3rem;font-size:.88rem">
+                <span>🔒 ${l.title}</span>
+                <span class="text-muted">${formatDuration(l.duration)}</span>
+              </div>`).join('')}
+          </div>`).join('');
+            }
+
+            // Reviews
+            const revEl = document.getElementById('reviewsSection');
+            const revList = reviews.results || reviews;
+            if (!revList.length) {
+                revEl.innerHTML = '<p class="text-muted" style="font-size:.9rem">No reviews yet. Be the first!</p>';
+            } else {
+                revEl.innerHTML = revList.map(r => `
+          <div style="padding:.9rem 0;border-bottom:1px solid var(--border)">
+            <div class="flex-between">
+              <strong style="font-size:.9rem">${r.student_name || 'Student'}</strong>
+              <span class="stars" style="font-size:.85rem">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+            </div>
+            <p class="text-muted mt-1" style="font-size:.88rem">${r.comment || ''}</p>
+          </div>`).join('');
+            }
+
+            // Enroll button logic
+            const enrollBtn = document.getElementById('enrollBtn');
+            if (!token) {
+                enrollBtn.textContent = 'Login to Enroll';
+                enrollBtn.onclick = () => window.location.href = '/login/';
+            } else if (role !== 'STUDENT') {
+                enrollBtn.textContent = 'Students Only';
+                enrollBtn.disabled = true;
+            } else {
+                // Check if already enrolled
+                try {
+                    const myRes = await fetch(`${API}/my-courses/`, { headers: headers() });
+                    const myData = await myRes.json();
+                    const enrolled = (myData.results || myData).some(e => e.course_title === course.title);
+                    if (enrolled) {
+                        enrollBtn.textContent = '✅ Already Enrolled';
+                        enrollBtn.disabled = true;
+                        enrollBtn.style.background = 'var(--success)';
+                        document.getElementById('reviewForm').classList.remove('hidden');
+                    } else {
+                        enrollBtn.onclick = () => enroll(course.id);
+                    }
+                } catch (e) { enrollBtn.onclick = () => enroll(course.id); }
+            }
+        }
+
+        async function enroll(courseId) {
+            const btn = document.getElementById('enrollBtn');
+            const alertEl = document.getElementById('enrollAlert');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Enrolling…';
+
+            try {
+                const res = await fetch(`${API}/enroll/`, {
+                    method: 'POST',
+                    headers: headers(),
+                    body: JSON.stringify({ course_id: courseId }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(Object.values(data).flat()[0] || 'Enrollment failed.');
+                btn.textContent = '✅ Enrolled!';
+                btn.style.background = 'var(--success)';
+                alertEl.className = 'alert alert-success';
+                alertEl.textContent = 'Successfully enrolled! Visit your dashboard to start learning.';
+                alertEl.classList.remove('hidden');
+                document.getElementById('reviewForm').classList.remove('hidden');
+            } catch (err) {
+                alertEl.className = 'alert alert-danger';
+                alertEl.textContent = err.message;
+                alertEl.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Enroll Now';
+            }
+        }
+
+        document.getElementById('submitReview').addEventListener('click', async () => {
+            const alertEl = document.getElementById('reviewAlert');
+            const payload = {
+                course: parseInt(courseId),
+                rating: parseInt(document.getElementById('reviewRating').value),
+                comment: document.getElementById('reviewComment').value,
+            };
+            try {
+                const res = await fetch(`${API}/courses/${courseId}/reviews/`, {
+                    method: 'POST', headers: headers(), body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(Object.values(data).flat()[0] || 'Could not submit review.');
+                alertEl.className = 'alert alert-success';
+                alertEl.textContent = 'Review submitted!';
+                alertEl.classList.remove('hidden');
+                document.getElementById('reviewForm').classList.add('hidden');
+                loadCourse();
+            } catch (err) {
+                alertEl.className = 'alert alert-danger';
+                alertEl.textContent = err.message;
+                alertEl.classList.remove('hidden');
+            }
+        });
+
+        loadCourse();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Courses – OCMS</title>
+    <meta name="description" content="Browse all available courses on OCMS. Filter by category, level, and price.">
+    <link rel="stylesheet" href="/static/css/ocms.css">
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <span class="navbar-brand">🎓 OCMS</span>
+        <div class="navbar-links" id="navLinks">
+            <a href="/">Courses</a>
+            <a href="/login/" id="loginLink">Login</a>
+            <a href="/register/" id="registerLink" class="btn btn-primary btn-sm">Register</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Hero -->
+        <div class="hero">
+            <h1>Learn Without Limits</h1>
+            <p>Explore hundreds of expert-led courses across development, design, data science, and more.</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="card card-body mb-3" style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
+            <div class="form-group" style="flex:1;min-width:160px;margin:0">
+                <label class="form-label">Category</label>
+                <select class="form-control" id="filterCategory">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:140px;margin:0">
+                <label class="form-label">Level</label>
+                <select class="form-control" id="filterLevel">
+                    <option value="">All Levels</option>
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:120px;margin:0">
+                <label class="form-label">Sort By</label>
+                <select class="form-control" id="filterOrder">
+                    <option value="-created_at">Newest</option>
+                    <option value="price">Price ↑</option>
+                    <option value="-price">Price ↓</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:200px;margin:0">
+                <label class="form-label">Search</label>
+                <input class="form-control" type="text" id="searchInput" placeholder="Search courses…">
+            </div>
+            <button class="btn btn-primary" id="applyFilters">Apply</button>
+            <button class="btn btn-outline" id="clearFilters">Clear</button>
+        </div>
+
+        <!-- Results count -->
+        <p class="text-muted mb-2" id="resultsInfo" style="font-size:.9rem"></p>
+
+        <!-- Course Grid -->
+        <div class="grid" id="courseGrid"></div>
+
+        <!-- Empty state -->
+        <div id="emptyState" class="hidden text-center mt-4">
+            <p style="font-size:3rem">🔍</p>
+            <p class="text-muted mt-2">No courses found. Try adjusting your filters.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <script>
+        const API = '/api';
+        let currentPage = 1;
+        let currentParams = {};
+
+        // Navbar auth state
+        const token = localStorage.getItem('access_token');
+        const role = localStorage.getItem('user_role');
+        const name = localStorage.getItem('user_name');
+        if (token && name) {
+            document.getElementById('navLinks').innerHTML = `
+        <a href="/">Courses</a>
+        ${role === 'STUDENT' ? '<a href="/student/dashboard/">My Learning</a>' : ''}
+        ${role === 'INSTRUCTOR' ? '<a href="/instructor/dashboard/">Dashboard</a>' : ''}
+        ${role === 'ADMIN' ? '<a href="/admin-dashboard/">Admin</a>' : ''}
+        <span class="text-muted" style="font-size:.85rem">Hi, ${name.split(' ')[0]}</span>
+        <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>`;
+        }
+
+        async function logout() {
+            try {
+                await fetch(`${API}/auth/logout/`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ refresh: localStorage.getItem('refresh_token') }) });
+            } catch (e) { }
+            localStorage.clear();
+            window.location.href = '/login/';
+        }
+
+        function authHeaders() {
+            const t = localStorage.getItem('access_token');
+            return { 'Content-Type': 'application/json', ...(t ? { 'Authorization': `Bearer ${t}` } : {}) };
+        }
+
+        // Load categories
+        async function loadCategories() {
+            const res = await fetch(`${API}/categories/`);
+            const data = await res.json();
+            const sel = document.getElementById('filterCategory');
+            (data.results || data).forEach(c => {
+                sel.innerHTML += `<option value="${c.slug}">${c.name}</option>`;
+            });
+        }
+
+        // Load courses
+        async function loadCourses(page = 1) {
+            currentPage = page;
+            const params = new URLSearchParams({ page, ...currentParams });
+            const res = await fetch(`${API}/courses/?${params}`);
+            const data = await res.json();
+
+            const grid = document.getElementById('courseGrid');
+            const empty = document.getElementById('emptyState');
+            const info = document.getElementById('resultsInfo');
+            const courses = data.results || [];
+
+            grid.innerHTML = '';
+            if (courses.length === 0) {
+                empty.classList.remove('hidden');
+                info.textContent = '';
+            } else {
+                empty.classList.add('hidden');
+                info.textContent = `Showing ${courses.length} of ${data.count || courses.length} courses`;
+                courses.forEach(c => {
+                    const stars = '★'.repeat(Math.round(c.average_rating || 0)) + '☆'.repeat(5 - Math.round(c.average_rating || 0));
+                    grid.innerHTML += `
+            <div class="card" onclick="window.location.href='/courses/${c.id}/'">
+              ${c.thumbnail
+                            ? `<img class="course-thumb" src="${c.thumbnail}" alt="${c.title}">`
+                            : `<div class="course-thumb-placeholder">📚</div>`}
+              <div class="card-body">
+                <div class="flex-between mb-1">
+                  <span class="badge badge-accent">${c.level}</span>
+                  <span class="badge badge-muted">${c.category?.name || 'General'}</span>
+                </div>
+                <h3 style="font-size:1rem;font-weight:700;margin:.5rem 0">${c.title}</h3>
+                <p class="text-muted" style="font-size:.82rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${c.description}</p>
+                <p class="text-muted mt-1" style="font-size:.8rem">by ${c.instructor_name}</p>
+                <div class="flex-between mt-2">
+                  <span class="stars" style="font-size:.85rem">${stars}</span>
+                  <span style="color:var(--muted);font-size:.8rem">${c.enrollment_count} enrolled</span>
+                </div>
+                <div class="flex-between mt-2">
+                  <strong style="font-size:1.05rem;color:var(--accent)">${c.price == 0 ? 'Free' : '₹' + c.price}</strong>
+                  <span class="btn btn-primary btn-sm">View Course</span>
+                </div>
+              </div>
+            </div>`;
+                });
+            }
+
+            // Pagination
+            buildPagination(data.count, data.results?.length, page);
+        }
+
+        function buildPagination(total, pageSize, current) {
+            const container = document.getElementById('pagination');
+            container.innerHTML = '';
+            if (!total || total <= (pageSize || 10)) return;
+            const totalPages = Math.ceil(total / (pageSize || 10));
+            if (current > 1) {
+                const b = document.createElement('button'); b.textContent = '← Prev'; b.onclick = () => loadCourses(current - 1);
+                container.appendChild(b);
+            }
+            for (let i = 1; i <= totalPages; i++) {
+                const b = document.createElement('button');
+                b.textContent = i;
+                if (i === current) b.classList.add('active');
+                b.onclick = () => loadCourses(i);
+                container.appendChild(b);
+            }
+            if (current < totalPages) {
+                const b = document.createElement('button'); b.textContent = 'Next →'; b.onclick = () => loadCourses(current + 1);
+                container.appendChild(b);
+            }
+        }
+
+        document.getElementById('applyFilters').addEventListener('click', () => {
+            currentParams = {};
+            const cat = document.getElementById('filterCategory').value;
+            const lvl = document.getElementById('filterLevel').value;
+            const ord = document.getElementById('filterOrder').value;
+            const srch = document.getElementById('searchInput').value.trim();
+            if (cat) currentParams.category = cat;
+            if (lvl) currentParams.level = lvl;
+            if (ord) currentParams.ordering = ord;
+            if (srch) currentParams.search = srch;
+            loadCourses(1);
+        });
+
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            document.getElementById('filterCategory').value = '';
+            document.getElementById('filterLevel').value = '';
+            document.getElementById('filterOrder').value = '-created_at';
+            document.getElementById('searchInput').value = '';
+            currentParams = {};
+            loadCourses(1);
+        });
+
+        loadCategories();
+        loadCourses(1);
+    </script>
+</body>
+
+</html>

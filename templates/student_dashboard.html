@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Learning – OCMS</title>
+    <meta name="description" content="Track your enrolled courses and learning progress on OCMS.">
+    <link rel="stylesheet" href="/static/css/ocms.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a class="navbar-brand" href="/">🎓 OCMS</a>
+        <div class="navbar-links">
+            <a href="/">Browse Courses</a>
+            <span class="text-muted" style="font-size:.85rem" id="userGreet"></span>
+            <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:3rem">
+        <!-- Header stats -->
+        <div class="flex-between mb-4">
+            <div>
+                <h1 style="font-size:1.8rem;font-weight:800">My Learning</h1>
+                <p class="text-muted">Continue where you left off</p>
+            </div>
+            <a href="/" class="btn btn-primary">+ Explore More</a>
+        </div>
+
+        <div class="grid-3 mb-4" id="statsRow">
+            <div class="stat-card">
+                <div class="stat-value" id="statTotal">–</div>
+                <div class="stat-label">Courses Enrolled</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statCompleted">–</div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="statInProgress">–</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+        </div>
+
+        <!-- Enrolled Courses -->
+        <h2 style="font-size:1.2rem;font-weight:700;margin-bottom:1.2rem">Enrolled Courses</h2>
+        <div id="loadingCards" class="text-center"><span class="spinner"
+                style="width:36px;height:36px;border-width:3px"></span></div>
+        <div class="grid" id="enrolledGrid"></div>
+        <div id="emptyState" class="hidden text-center mt-4">
+            <p style="font-size:3rem">📭</p>
+            <p class="text-muted mt-2">You're not enrolled in any courses yet.</p>
+            <a href="/" class="btn btn-primary mt-3">Browse Courses</a>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        const token = localStorage.getItem('access_token');
+        const role = localStorage.getItem('user_role');
+        const name = localStorage.getItem('user_name');
+
+        // Redirect guard
+        if (!token || role !== 'STUDENT') { window.location.href = '/login/'; }
+        document.getElementById('userGreet').textContent = `Hi, ${name?.split(' ')[0] || ''}`;
+
+        function logout() { localStorage.clear(); window.location.href = '/login/'; }
+        function headers() { return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }; }
+
+        async function loadDashboard() {
+            try {
+                const res = await fetch(`${API}/my-courses/`, { headers: headers() });
+                const data = await res.json();
+                const courses = data.results || data;
+
+                document.getElementById('loadingCards').classList.add('hidden');
+
+                if (!courses.length) {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                    document.getElementById('statTotal').textContent = 0;
+                    document.getElementById('statCompleted').textContent = 0;
+                    document.getElementById('statInProgress').textContent = 0;
+                    return;
+                }
+
+                const completed = courses.filter(e => e.status === 'COMPLETED').length;
+                document.getElementById('statTotal').textContent = courses.length;
+                document.getElementById('statCompleted').textContent = completed;
+                document.getElementById('statInProgress').textContent = courses.length - completed;
+
+                const grid = document.getElementById('enrolledGrid');
+                courses.forEach(e => {
+                    const pct = e.progress_percentage || 0;
+                    const isDone = e.status === 'COMPLETED';
+                    grid.innerHTML += `
+            <div class="card">
+              ${e.course_thumbnail
+                            ? `<img class="course-thumb" src="${e.course_thumbnail}" alt="${e.course_title}">`
+                            : `<div class="course-thumb-placeholder">📚</div>`}
+              <div class="card-body">
+                <div class="flex-between mb-1">
+                  ${isDone ? '<span class="badge badge-success">✓ Completed</span>' : '<span class="badge badge-accent">In Progress</span>'}
+                  <span class="text-muted" style="font-size:.8rem">${pct}%</span>
+                </div>
+                <h3 style="font-size:.95rem;font-weight:700;margin:.5rem 0">${e.course_title}</h3>
+                <div class="progress-wrap mt-2">
+                  <div class="progress-bar" style="width:${pct}%"></div>
+                </div>
+                <div class="flex gap-1 mt-3">
+                  <a href="/courses/${e.course_id || '#'}/" class="btn btn-primary btn-sm w-100">Continue Learning</a>
+                </div>
+              </div>
+            </div>`;
+                });
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loadingCards').innerHTML = '<p class="text-muted">Could not load courses. Please refresh.</p>';
+            }
+        }
+
+        loadDashboard();
+    </script>
+</body>
+
+</html>
