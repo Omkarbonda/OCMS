@@ -9,28 +9,33 @@
 }
 
 :root {
-    --bg: #0a0e1a;
-    --surface: #111827;
-    --surface2: #1c2637;
-    --border: #1e2d45;
-    --accent: #6366f1;
-    --accent2: #8b5cf6;
+    --bg: #05070a;
+    --surface: #0c111d;
+    --surface2: #161d2f;
+    --border: #1f2937;
+    --border-hover: #374151;
+    --accent: #06b6d4;
+    --accent-glow: rgba(6, 182, 212, 0.4);
+    --accent2: #6366f1;
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #ef4444;
-    --text: #f1f5f9;
-    --muted: #94a3b8;
-    --card-glow: 0 0 0 1px rgba(99, 102, 241, .3), 0 8px 32px rgba(0, 0, 0, .5);
-    --radius: 12px;
-    --transition: .2s ease;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --card-glow: 0 0 20px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border);
+    --card-hover-glow: 0 0 30px rgba(6, 182, 212, 0.15), 0 0 0 1px var(--accent);
+    --radius: 16px;
+    --radius-sm: 8px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: radial-gradient(circle at top center, #0e1629 0%, var(--bg) 100%);
     color: var(--text);
     min-height: 100vh;
     line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* ── Navbar ── */
@@ -38,9 +43,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem 2rem;
-    background: rgba(17, 24, 39, .85);
-    backdrop-filter: blur(12px);
+    padding: 1.25rem 2rem;
+    background: rgba(5, 7, 10, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
@@ -90,13 +95,16 @@ body {
 }
 
 .btn-primary {
+    background: var(--accent);
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     color: #fff;
+    box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .btn-primary:hover {
-    filter: brightness(1.15);
-    transform: translateY(-1px);
+    filter: brightness(1.1);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--accent-glow);
 }
 
 .btn-outline {
@@ -106,8 +114,9 @@ body {
 }
 
 .btn-outline:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--muted);
+    transform: translateY(-1px);
 }
 
 .btn-success {
@@ -131,12 +140,28 @@ body {
     border-radius: var(--radius);
     border: 1px solid var(--border);
     overflow: hidden;
-    transition: transform var(--transition), box-shadow var(--transition);
+    transition: var(--transition);
+    position: relative;
+}
+
+.card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
 }
 
 .card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--card-glow);
+    transform: translateY(-6px);
+    box-shadow: var(--card-hover-glow);
+    border-color: rgba(6, 182, 212, 0.3);
 }
 
 .card-body {

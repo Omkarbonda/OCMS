@@ -23,20 +23,26 @@
     <div class="container">
         <!-- Hero -->
         <div class="hero">
-            <h1>Learn Without Limits</h1>
-            <p>Explore hundreds of expert-led courses across development, design, data science, and more.</p>
+            <h1
+                style="background: linear-gradient(135deg, #fff 0%, var(--accent) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-size: 2.5rem; font-weight: 800; letter-spacing: -0.02em;">
+                Learn Without Limits</h1>
+            <p style="font-size: 1.25rem; color: var(--muted); opacity: 0.9;">Explore expert-led courses across
+                development, design, and data science.</p>
         </div>
 
         <!-- Filters -->
-        <div class="card card-body mb-3" style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end">
-            <div class="form-group" style="flex:1;min-width:160px;margin:0">
-                <label class="form-label">Category</label>
+        <div class="card card-body mb-3"
+            style="display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-end; background: rgba(255,255,255,0.02); border-color: var(--border);">
+            <div class="form-group" style="flex:1;min-width:180px;margin:0">
+                <label class="form-label"
+                    style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem;">Category</label>
                 <select class="form-control" id="filterCategory">
                     <option value="">All Categories</option>
                 </select>
             </div>
-            <div class="form-group" style="flex:1;min-width:140px;margin:0">
-                <label class="form-label">Level</label>
+            <div class="form-group" style="flex:1;min-width:160px;margin:0">
+                <label class="form-label"
+                    style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem;">Level</label>
                 <select class="form-control" id="filterLevel">
                     <option value="">All Levels</option>
                     <option value="Beginner">Beginner</option>
@@ -44,20 +50,24 @@
                     <option value="Advanced">Advanced</option>
                 </select>
             </div>
-            <div class="form-group" style="flex:1;min-width:120px;margin:0">
-                <label class="form-label">Sort By</label>
+            <div class="form-group" style="flex:1;min-width:140px;margin:0">
+                <label class="form-label"
+                    style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem;">Sort By</label>
                 <select class="form-control" id="filterOrder">
                     <option value="-created_at">Newest</option>
                     <option value="price">Price ↑</option>
                     <option value="-price">Price ↓</option>
                 </select>
             </div>
-            <div class="form-group" style="flex:1;min-width:200px;margin:0">
-                <label class="form-label">Search</label>
+            <div class="form-group" style="flex:2;min-width:240px;margin:0">
+                <label class="form-label"
+                    style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem;">Search</label>
                 <input class="form-control" type="text" id="searchInput" placeholder="Search courses…">
             </div>
-            <button class="btn btn-primary" id="applyFilters">Apply</button>
-            <button class="btn btn-outline" id="clearFilters">Clear</button>
+            <div style="display: flex; gap: 0.75rem;">
+                <button class="btn btn-primary" id="applyFilters">Apply</button>
+                <button class="btn btn-outline" id="clearFilters">Clear</button>
+            </div>
         </div>
 
         <!-- Results count -->

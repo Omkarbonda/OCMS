@@ -22,8 +22,10 @@
     <div class="container" style="padding-top:2rem;padding-bottom:3rem">
         <div class="flex-between mb-4">
             <div>
-                <h1 style="font-size:1.8rem;font-weight:800">Admin Dashboard</h1>
-                <p class="text-muted">Platform overview and analytics</p>
+                <h1
+                    style="font-size:2rem;font-weight:800;letter-spacing:-0.02em;background: linear-gradient(135deg, #fff, var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
+                    Admin Dashboard</h1>
+                <p class="text-muted">Platform overview and performance analytics</p>
             </div>
             <button class="btn btn-outline" id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
         </div>
@@ -32,27 +34,27 @@
 
         <!-- KPI Stats -->
         <div class="grid-3 mb-4" id="statsGrid">
-            <div class="stat-card">
+            <div class="stat-card card">
                 <div class="stat-value" id="statStudents">…</div>
                 <div class="stat-label">Total Students</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card card">
                 <div class="stat-value" id="statInstructors">…</div>
                 <div class="stat-label">Instructors</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card card">
                 <div class="stat-value" id="statCourses">…</div>
                 <div class="stat-label">Total Courses</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card card">
                 <div class="stat-value" id="statPublished">…</div>
                 <div class="stat-label">Published Courses</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card card">
                 <div class="stat-value" id="statEnrollments">…</div>
                 <div class="stat-label">Total Enrollments</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card card">
                 <div class="stat-value" id="statCompleted">…</div>
                 <div class="stat-label">Completed</div>
             </div>
